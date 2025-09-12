@@ -98,7 +98,21 @@ function App() {
   };
 
   const handleCreateMemory = async (data: CreateMemoryData) => {
-    if (!user) return;
+    if (!user) {
+      console.error("No user found when creating memory");
+      return;
+    }
+
+    console.log("Creating memory for user:", user.id);
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    console.log("User session:", sessionData);
+
+    if (sessionError || !sessionData.session) {
+      console.error("No valid session found:", sessionError);
+      alert("Please sign in again to create memories.");
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -110,12 +124,31 @@ function App() {
           .toString(36)
           .substring(2)}.${fileExt}`;
         const filePath = `memories/${user.id}/${fileName}`;
+        console.log("Uploading file to path:", filePath);
 
-        const { error: uploadError } = await supabase.storage
+        console.log("Attempting to upload file:", {
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          filePath: filePath,
+          bucketName: "memory-media",
+        });
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from("memory-media")
           .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        console.log("Upload response:", { uploadData, uploadError });
+
+        if (uploadError) {
+          console.error("Storage upload error details:", {
+            message: uploadError.message,
+            statusCode: uploadError.statusCode,
+            error: uploadError.error,
+            details: uploadError,
+          });
+          throw uploadError;
+        }
 
         const {
           data: { publicUrl },
@@ -125,6 +158,20 @@ function App() {
       }
 
       // Create memory record
+      console.log("Inserting memory with data:", {
+        title: data.title,
+        description: data.description,
+        latitude: data.location.latitude,
+        longitude: data.location.longitude,
+        address: data.location.address,
+        city: data.location.city,
+        country: data.location.country,
+        media_urls: mediaUrls,
+        tags: data.tags,
+        is_public: data.isPublic,
+        user_id: user.id,
+      });
+
       const { data: newMemory, error } = await supabase
         .from("memories")
         .insert({
@@ -143,7 +190,10 @@ function App() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database error details:", error);
+        throw error;
+      }
 
       // Add to local state
       const formattedMemory: Memory = {

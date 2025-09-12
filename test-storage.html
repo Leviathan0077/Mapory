@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Storage Bucket Test</h1>
+    <div id="status"></div>
+    <button onclick="testStorage()">Test Storage Access</button>
+    <button onclick="testUpload()">Test File Upload</button>
+    <input type="file" id="fileInput" accept="image/*">
+    
+    <script>
+        // Replace with your actual Supabase credentials
+        const supabaseUrl = 'YOUR_SUPABASE_URL';
+        const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testStorage() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing storage access...';
+            
+            try {
+                // Test if we can list buckets
+                const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+                
+                if (bucketsError) {
+                    statusDiv.innerHTML = `Bucket list error: ${bucketsError.message}`;
+                    return;
+                }
+                
+                console.log('Available buckets:', buckets);
+                
+                // Check if memory-media bucket exists
+                const memoryBucket = buckets.find(bucket => bucket.id === 'memory-media');
+                
+                if (!memoryBucket) {
+                    statusDiv.innerHTML = 'memory-media bucket not found! Available buckets: ' + buckets.map(b => b.id).join(', ');
+                } else {
+                    statusDiv.innerHTML = `Found memory-media bucket: ${JSON.stringify(memoryBucket, null, 2)}`;
+                }
+                
+                // Test listing files in the bucket
+                const { data: files, error: filesError } = await supabase.storage
+                    .from('memory-media')
+                    .list('memories', { limit: 10 });
+                
+                if (filesError) {
+                    statusDiv.innerHTML += `<br>Error listing files: ${filesError.message}`;
+                } else {
+                    statusDiv.innerHTML += `<br>Files in bucket: ${JSON.stringify(files, null, 2)}`;
+                }
+                
+            } catch (err) {
+                statusDiv.innerHTML = `Storage test error: ${err.message}`;
+            }
+        }
+        
+        async function testUpload() {
+            const statusDiv = document.getElementById('status');
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!fileInput.files[0]) {
+                statusDiv.innerHTML = 'Please select a file first';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const fileName = `test-${Date.now()}.${file.name.split('.').pop()}`;
+            const filePath = `memories/test-user/${fileName}`;
+            
+            statusDiv.innerHTML = 'Testing file upload...';
+            
+            try {
+                console.log('Uploading file:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    path: filePath
+                });
+                
+                const { data, error } = await supabase.storage
+                    .from('memory-media')
+                    .upload(filePath, file);
+                
+                if (error) {
+                    statusDiv.innerHTML = `Upload error: ${error.message}<br>Details: ${JSON.stringify(error, null, 2)}`;
+                } else {
+                    statusDiv.innerHTML = `Upload successful!<br>Data: ${JSON.stringify(data, null, 2)}`;
+                }
+                
+            } catch (err) {
+                statusDiv.innerHTML = `Upload error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

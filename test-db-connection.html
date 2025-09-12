@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Connection Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Mapory Database Connection Test</h1>
+    <div id="status"></div>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testAuth()">Test Authentication</button>
+    <button onclick="testInsert()">Test Memory Insert</button>
+    
+    <script>
+        // Replace with your actual Supabase credentials
+        const supabaseUrl = 'YOUR_SUPABASE_URL';
+        const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testConnection() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing connection...';
+            
+            try {
+                const { data, error } = await supabase.from('memories').select('count').limit(1);
+                if (error) {
+                    statusDiv.innerHTML = `Connection Error: ${error.message}`;
+                } else {
+                    statusDiv.innerHTML = 'Connection successful!';
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `Connection Error: ${err.message}`;
+            }
+        }
+        
+        async function testAuth() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing authentication...';
+            
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                if (error) {
+                    statusDiv.innerHTML = `Auth Error: ${error.message}`;
+                } else if (user) {
+                    statusDiv.innerHTML = `Authenticated as: ${user.email} (ID: ${user.id})`;
+                } else {
+                    statusDiv.innerHTML = 'Not authenticated. Please sign in first.';
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `Auth Error: ${err.message}`;
+            }
+        }
+        
+        async function testInsert() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing memory insert...';
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    statusDiv.innerHTML = 'Please authenticate first';
+                    return;
+                }
+                
+                const { data, error } = await supabase
+                    .from('memories')
+                    .insert({
+                        title: 'Test Memory',
+                        description: 'This is a test memory',
+                        latitude: 40.7128,
+                        longitude: -74.006,
+                        address: 'Test Address',
+                        city: 'Test City',
+                        country: 'Test Country',
+                        media_urls: [],
+                        tags: ['test'],
+                        is_public: false,
+                        user_id: user.id
+                    })
+                    .select()
+                    .single();
+                
+                if (error) {
+                    statusDiv.innerHTML = `Insert Error: ${error.message}`;
+                } else {
+                    statusDiv.innerHTML = `Insert successful! Memory ID: ${data.id}`;
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `Insert Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
