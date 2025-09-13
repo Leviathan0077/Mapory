@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Likes Feature</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Test Likes Feature</h1>
+    <div id="status"></div>
+    <button onclick="testLikesTable()">Test Likes Table</button>
+    <button onclick="testLikeInsert()">Test Like Insert</button>
+    
+    <script>
+        // Replace with your actual Supabase credentials
+        const supabaseUrl = 'YOUR_SUPABASE_URL';
+        const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testLikesTable() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing likes table...';
+            
+            try {
+                // Test if likes table exists and is accessible
+                const { data, error } = await supabase
+                    .from('memory_likes')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) {
+                    statusDiv.innerHTML = `Likes table error: ${error.message}`;
+                } else {
+                    statusDiv.innerHTML = `Likes table accessible! Found ${data.length} records.`;
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `Error: ${err.message}`;
+            }
+        }
+        
+        async function testLikeInsert() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing like insert...';
+            
+            try {
+                // First get a memory ID
+                const { data: memories, error: memError } = await supabase
+                    .from('memories')
+                    .select('id')
+                    .limit(1);
+                
+                if (memError || !memories || memories.length === 0) {
+                    statusDiv.innerHTML = 'No memories found to test with';
+                    return;
+                }
+                
+                const memoryId = memories[0].id;
+                
+                // Test inserting a like
+                const { data, error } = await supabase
+                    .from('memory_likes')
+                    .insert({
+                        memory_id: memoryId,
+                        user_id: 'test-user-id'
+                    });
+                
+                if (error) {
+                    statusDiv.innerHTML = `Like insert error: ${error.message}`;
+                } else {
+                    statusDiv.innerHTML = `Like insert successful! Data: ${JSON.stringify(data)}`;
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -17,6 +17,8 @@ export interface Memory {
   userId: string;
   tags?: string[];
   isPublic: boolean;
+  likeCount?: number;
+  isLikedByUser?: boolean;
 }
 
 export interface User {

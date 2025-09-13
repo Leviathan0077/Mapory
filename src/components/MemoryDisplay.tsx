@@ -9,6 +9,7 @@ import {
   EyeOff,
   Share2,
   Download,
+  Heart,
 } from "lucide-react";
 import type { Memory } from "../types";
 
@@ -17,6 +18,7 @@ interface MemoryDisplayProps {
   onClose: () => void;
   onEdit?: (memory: Memory) => void;
   onDelete?: (memoryId: string) => void;
+  onLike?: (memoryId: string) => void;
   isOwner?: boolean;
 }
 
@@ -25,6 +27,7 @@ const MemoryDisplay: React.FC<MemoryDisplayProps> = ({
   onClose,
   onEdit,
   onDelete,
+  onLike,
   isOwner = false,
 }) => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -98,6 +101,22 @@ const MemoryDisplay: React.FC<MemoryDisplayProps> = ({
             </div>
           </div>
           <div className="memory-actions">
+            <button
+              onClick={() => {
+                console.log("Like button clicked for memory:", memory.id);
+                console.log("onLike function:", onLike);
+                onLike?.(memory.id);
+              }}
+              className={`action-button like-button ${
+                memory.isLikedByUser ? "liked" : ""
+              }`}
+            >
+              <Heart
+                size={16}
+                fill={memory.isLikedByUser ? "currentColor" : "none"}
+              />
+              {memory.likeCount || 0}
+            </button>
             {isOwner && (
               <>
                 <button

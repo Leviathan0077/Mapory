@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, LogOut } from "lucide-react";
+import { Plus, Search, LogOut, MapPin } from "lucide-react";
 import Map from "./components/Map";
 import MemoryForm from "./components/MemoryForm";
 import MemoryDisplay from "./components/MemoryDisplay";
+import LocationPermission from "./components/LocationPermission";
 import type { Memory, Location, CreateMemoryData, MapViewport } from "./types";
 import { supabase } from "./lib/supabase";
 import "./App.css";
@@ -23,6 +24,7 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTags] = useState<string[]>([]);
+  const [showLocationPermission, setShowLocationPermission] = useState(false);
 
   // Initialize user session
   useEffect(() => {
@@ -52,34 +54,69 @@ function App() {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      // First, get all memories
+      const { data: memoriesData, error: memoriesError } = await supabase
         .from("memories")
         .select("*")
         .or(`user_id.eq.${user.id},is_public.eq.true`)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (memoriesError) throw memoriesError;
 
-      const formattedMemories: Memory[] = data.map((memory) => ({
-        id: memory.id,
-        title: memory.title,
-        description: memory.description,
-        location: {
-          latitude: memory.latitude,
-          longitude: memory.longitude,
-          address: memory.address,
-          city: memory.city,
-          country: memory.country,
-        },
-        mediaUrls: memory.media_urls,
-        tags: memory.tags,
-        isPublic: memory.is_public,
-        userId: memory.user_id,
-        createdAt: memory.created_at,
-        updatedAt: memory.updated_at,
-      }));
+      if (!memoriesData || memoriesData.length === 0) {
+        setMemories([]);
+        return;
+      }
 
-      setMemories(formattedMemories);
+      // Get all memory IDs
+      const memoryIds = memoriesData.map((m) => m.id);
+
+      // Get like counts for all memories at once
+      const { data: likesData, error: likesError } = await supabase
+        .from("memory_likes")
+        .select("memory_id, user_id")
+        .in("memory_id", memoryIds);
+
+      if (likesError) {
+        console.error("Error loading likes:", likesError);
+        // Continue without likes data
+      }
+
+      // Process the data
+      const memoriesWithLikes = memoriesData.map((memory) => {
+        // Count likes for this memory
+        const likeCount =
+          likesData?.filter((like) => like.memory_id === memory.id).length || 0;
+
+        // Check if current user liked this memory
+        const isLikedByUser =
+          likesData?.some(
+            (like) => like.memory_id === memory.id && like.user_id === user.id
+          ) || false;
+
+        return {
+          id: memory.id,
+          title: memory.title,
+          description: memory.description,
+          location: {
+            latitude: memory.latitude,
+            longitude: memory.longitude,
+            address: memory.address,
+            city: memory.city,
+            country: memory.country,
+          },
+          mediaUrls: memory.media_urls,
+          tags: memory.tags,
+          isPublic: memory.is_public,
+          userId: memory.user_id,
+          createdAt: memory.created_at,
+          updatedAt: memory.updated_at,
+          likeCount,
+          isLikedByUser,
+        };
+      });
+
+      setMemories(memoriesWithLikes);
     } catch (error) {
       console.error("Error loading memories:", error);
     }
@@ -90,6 +127,21 @@ function App() {
       latitude: coordinates[1],
       longitude: coordinates[0],
     });
+    setShowMemoryForm(true);
+  };
+
+  const handleNewMemoryClick = () => {
+    setShowLocationPermission(true);
+  };
+
+  const handleLocationGranted = (location: Location) => {
+    setSelectedLocation(location);
+    setShowLocationPermission(false);
+    setShowMemoryForm(true);
+  };
+
+  const handleLocationDenied = () => {
+    setShowLocationPermission(false);
     setShowMemoryForm(true);
   };
 
@@ -249,6 +301,117 @@ function App() {
     await supabase.auth.signOut();
   };
 
+  const handleLikeMemory = async (memoryId: string) => {
+    if (!user) {
+      console.error("No user found when trying to like memory");
+      return;
+    }
+
+    console.log("Attempting to like memory:", memoryId);
+    console.log("Current user:", user.id);
+
+    try {
+      const memory = memories.find((m) => m.id === memoryId);
+      if (!memory) {
+        console.error("Memory not found:", memoryId);
+        return;
+      }
+
+      console.log("Memory found:", memory.title);
+      console.log("Currently liked by user:", memory.isLikedByUser);
+
+      if (memory.isLikedByUser) {
+        // Unlike the memory
+        console.log("Unliking memory...");
+        const { error } = await supabase
+          .from("memory_likes")
+          .delete()
+          .eq("memory_id", memoryId)
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("Error unliking memory:", error);
+          throw error;
+        }
+
+        console.log("Successfully unliked memory");
+
+        // Update local state
+        setMemories((prev) => {
+          const updated = prev.map((m) =>
+            m.id === memoryId
+              ? {
+                  ...m,
+                  isLikedByUser: false,
+                  likeCount: Math.max(0, (m.likeCount || 0) - 1),
+                }
+              : m
+          );
+          console.log(
+            "Updated memories:",
+            updated.find((m) => m.id === memoryId)
+          );
+
+          // Update selectedMemory if it's the one being unliked
+          if (selectedMemory && selectedMemory.id === memoryId) {
+            const updatedMemory = updated.find((m) => m.id === memoryId);
+            if (updatedMemory) {
+              console.log("Updating selected memory:", updatedMemory);
+              setSelectedMemory(updatedMemory);
+            }
+          }
+
+          return updated;
+        });
+      } else {
+        // Like the memory
+        console.log("Liking memory...");
+        const { error } = await supabase.from("memory_likes").insert({
+          memory_id: memoryId,
+          user_id: user.id,
+        });
+
+        if (error) {
+          console.error("Error liking memory:", error);
+          throw error;
+        }
+
+        console.log("Successfully liked memory");
+
+        // Update local state
+        setMemories((prev) => {
+          const updated = prev.map((m) =>
+            m.id === memoryId
+              ? {
+                  ...m,
+                  isLikedByUser: true,
+                  likeCount: (m.likeCount || 0) + 1,
+                }
+              : m
+          );
+          console.log(
+            "Updated memories:",
+            updated.find((m) => m.id === memoryId)
+          );
+
+          // Update selectedMemory if it's the one being liked
+          if (selectedMemory && selectedMemory.id === memoryId) {
+            const updatedMemory = updated.find((m) => m.id === memoryId);
+            if (updatedMemory) {
+              console.log("Updating selected memory:", updatedMemory);
+              setSelectedMemory(updatedMemory);
+            }
+          }
+
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      alert("Failed to like memory. Please check the console for details.");
+    }
+  };
+
   // Filter memories based on search and tags
   const filteredMemories = memories.filter((memory) => {
     const matchesSearch =
@@ -299,10 +462,7 @@ function App() {
                 className="search-input"
               />
             </div>
-            <button
-              onClick={() => setShowMemoryForm(true)}
-              className="btn btn-primary"
-            >
+            <button onClick={handleNewMemoryClick} className="btn btn-primary">
               <Plus size={16} />
               New Memory
             </button>
@@ -333,20 +493,25 @@ function App() {
                     <div className="memory-item-date">
                       {new Date(memory.createdAt).toLocaleDateString()}
                     </div>
-                    {memory.tags && memory.tags.length > 0 && (
-                      <div className="memory-item-tags">
-                        {memory.tags.slice(0, 2).map((tag, index) => (
-                          <span key={index} className="memory-tag">
-                            {tag}
-                          </span>
-                        ))}
-                        {memory.tags.length > 2 && (
-                          <span className="memory-tag">
-                            +{memory.tags.length - 2}
-                          </span>
-                        )}
+                    <div className="memory-item-stats">
+                      <div className="memory-likes">
+                        ❤️ {memory.likeCount || 0}
                       </div>
-                    )}
+                      {memory.tags && memory.tags.length > 0 && (
+                        <div className="memory-item-tags">
+                          {memory.tags.slice(0, 2).map((tag, index) => (
+                            <span key={index} className="memory-tag">
+                              {tag}
+                            </span>
+                          ))}
+                          {memory.tags.length > 2 && (
+                            <span className="memory-tag">
+                              +{memory.tags.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -399,9 +564,17 @@ function App() {
           memory={selectedMemory}
           onClose={() => setSelectedMemory(null)}
           onDelete={handleDeleteMemory}
+          onLike={handleLikeMemory}
           isOwner={selectedMemory.userId === user.id}
         />
       )}
+
+      {/* Location Permission Modal */}
+      <LocationPermission
+        isVisible={showLocationPermission}
+        onLocationGranted={handleLocationGranted}
+        onLocationDenied={handleLocationDenied}
+      />
     </div>
   );
 }
