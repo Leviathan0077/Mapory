@@ -313,17 +313,70 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="app-main">
-        <div className="map-container">
-          <Map
-            memories={filteredMemories}
-            onMemoryClick={handleMemoryClick}
-            onMapClick={handleMapClick}
-            selectedMemoryId={selectedMemory?.id}
-            viewport={viewport}
-            onViewportChange={setViewport}
-          />
+      {/* Main Content - Split Layout */}
+      <main className="app-main-split">
+        {/* Left Sidebar */}
+        <aside className="app-sidebar">
+          <div className="sidebar-section">
+            <h3>Your Memories</h3>
+            <div className="memories-list">
+              {filteredMemories.map((memory) => (
+                <div
+                  key={memory.id}
+                  className={`memory-item ${
+                    selectedMemory?.id === memory.id ? "active" : ""
+                  }`}
+                  onClick={() => handleMemoryClick(memory)}
+                >
+                  <div className="memory-item-title">{memory.title}</div>
+                  <div className="memory-item-meta">
+                    <div className="memory-item-date">
+                      {new Date(memory.createdAt).toLocaleDateString()}
+                    </div>
+                    {memory.tags && memory.tags.length > 0 && (
+                      <div className="memory-item-tags">
+                        {memory.tags.slice(0, 2).map((tag, index) => (
+                          <span key={index} className="memory-tag">
+                            {tag}
+                          </span>
+                        ))}
+                        {memory.tags.length > 2 && (
+                          <span className="memory-tag">
+                            +{memory.tags.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {filteredMemories.length === 0 && (
+                <div
+                  style={{
+                    textAlign: "center",
+                    color: "#64748b",
+                    padding: "2rem 0",
+                  }}
+                >
+                  No memories yet. Click on the map to create your first memory!
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {/* Right Content - Map */}
+        <div className="app-content">
+          <div className="map-container">
+            <Map
+              memories={filteredMemories}
+              onMemoryClick={handleMemoryClick}
+              onMapClick={handleMapClick}
+              selectedMemoryId={selectedMemory?.id}
+              viewport={viewport}
+              onViewportChange={setViewport}
+            />
+          </div>
         </div>
       </main>
 
