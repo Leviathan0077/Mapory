@@ -49,3 +49,33 @@ export interface MapViewport {
   longitude: number;
   zoom: number;
 }
+
+export interface Friend {
+  friend_id: string;
+  friend_email: string;
+  friend_name: string;
+  friend_avatar_url: string;
+  friendship_created_at: string;
+}
+
+export interface FriendRequest {
+  request_id: string;
+  sender_id?: string;
+  receiver_id?: string;
+  sender_email?: string;
+  receiver_email?: string;
+  sender_name?: string;
+  receiver_name?: string;
+  sender_avatar_url?: string;
+  receiver_avatar_url?: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  avatar_url: string;
+  created_at: string;
+}

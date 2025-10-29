@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, LogOut, MapPin } from "lucide-react";
+import { Plus, Search, LogOut, Eye, EyeOff, Filter, Users } from "lucide-react";
 import Map from "./components/Map";
 import MemoryForm from "./components/MemoryForm";
 import MemoryDisplay from "./components/MemoryDisplay";
 import LocationPermission from "./components/LocationPermission";
+import Friends from "./components/Friends";
 import type { Memory, Location, CreateMemoryData, MapViewport } from "./types";
 import { supabase } from "./lib/supabase";
 import "./App.css";
@@ -24,7 +25,11 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTags] = useState<string[]>([]);
+  const [privacyFilter, setPrivacyFilter] = useState<
+    "all" | "public" | "private"
+  >("all");
   const [showLocationPermission, setShowLocationPermission] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
 
   // Initialize user session
   useEffect(() => {
@@ -195,8 +200,6 @@ function App() {
         if (uploadError) {
           console.error("Storage upload error details:", {
             message: uploadError.message,
-            statusCode: uploadError.statusCode,
-            error: uploadError.error,
             details: uploadError,
           });
           throw uploadError;
@@ -412,7 +415,7 @@ function App() {
     }
   };
 
-  // Filter memories based on search and tags
+  // Filter memories based on search, tags, and privacy
   const filteredMemories = memories.filter((memory) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -423,8 +426,17 @@ function App() {
       filterTags.length === 0 ||
       (memory.tags && filterTags.some((tag) => memory.tags!.includes(tag)));
 
-    return matchesSearch && matchesTags;
+    const matchesPrivacy =
+      privacyFilter === "all" ||
+      (privacyFilter === "public" && memory.isPublic) ||
+      (privacyFilter === "private" && !memory.isPublic);
+
+    return matchesSearch && matchesTags && matchesPrivacy;
   });
+
+  // Separate memories into private and public
+  const privateMemories = filteredMemories.filter((memory) => !memory.isPublic);
+  const publicMemories = filteredMemories.filter((memory) => memory.isPublic);
 
   if (!user) {
     return (
@@ -462,9 +474,32 @@ function App() {
                 className="search-input"
               />
             </div>
+            <div className="privacy-filter">
+              <Filter size={16} />
+              <select
+                value={privacyFilter}
+                onChange={(e) =>
+                  setPrivacyFilter(
+                    e.target.value as "all" | "public" | "private"
+                  )
+                }
+                className="privacy-select"
+              >
+                <option value="all">All Memories</option>
+                <option value="public">Public Only</option>
+                <option value="private">Private Only</option>
+              </select>
+            </div>
             <button onClick={handleNewMemoryClick} className="btn btn-primary">
               <Plus size={16} />
               New Memory
+            </button>
+            <button
+              onClick={() => setShowFriends(true)}
+              className="btn btn-secondary"
+            >
+              <Users size={16} />
+              Friends
             </button>
             <button onClick={handleSignOut} className="btn btn-secondary">
               <LogOut size={16} />
@@ -477,18 +512,30 @@ function App() {
       <main className="app-main-split">
         {/* Left Sidebar */}
         <aside className="app-sidebar">
+          {/* Private Memories Section */}
           <div className="sidebar-section">
-            <h3>Your Memories</h3>
+            <div className="section-header">
+              <h3>
+                <EyeOff size={16} />
+                Private Memories
+              </h3>
+              <span className="section-count">{privateMemories.length}</span>
+            </div>
             <div className="memories-list">
-              {filteredMemories.map((memory) => (
+              {privateMemories.map((memory) => (
                 <div
                   key={memory.id}
-                  className={`memory-item ${
+                  className={`memory-item private ${
                     selectedMemory?.id === memory.id ? "active" : ""
                   }`}
                   onClick={() => handleMemoryClick(memory)}
                 >
-                  <div className="memory-item-title">{memory.title}</div>
+                  <div className="memory-item-header">
+                    <div className="memory-item-title">{memory.title}</div>
+                    <div className="memory-privacy-indicator">
+                      <EyeOff size={14} className="privacy-icon private" />
+                    </div>
+                  </div>
                   <div className="memory-item-meta">
                     <div className="memory-item-date">
                       {new Date(memory.createdAt).toLocaleDateString()}
@@ -515,15 +562,69 @@ function App() {
                   </div>
                 </div>
               ))}
-              {filteredMemories.length === 0 && (
+              {privateMemories.length === 0 && (
+                <div className="empty-state">
+                  <EyeOff size={24} />
+                  <p>No private memories yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Public Memories Section */}
+          <div className="sidebar-section">
+            <div className="section-header">
+              <h3>
+                <Eye size={16} />
+                Public Memories
+              </h3>
+              <span className="section-count">{publicMemories.length}</span>
+            </div>
+            <div className="memories-list">
+              {publicMemories.map((memory) => (
                 <div
-                  style={{
-                    textAlign: "center",
-                    color: "#64748b",
-                    padding: "2rem 0",
-                  }}
+                  key={memory.id}
+                  className={`memory-item public ${
+                    selectedMemory?.id === memory.id ? "active" : ""
+                  }`}
+                  onClick={() => handleMemoryClick(memory)}
                 >
-                  No memories yet. Click on the map to create your first memory!
+                  <div className="memory-item-header">
+                    <div className="memory-item-title">{memory.title}</div>
+                    <div className="memory-privacy-indicator">
+                      <Eye size={14} className="privacy-icon public" />
+                    </div>
+                  </div>
+                  <div className="memory-item-meta">
+                    <div className="memory-item-date">
+                      {new Date(memory.createdAt).toLocaleDateString()}
+                    </div>
+                    <div className="memory-item-stats">
+                      <div className="memory-likes">
+                        ❤️ {memory.likeCount || 0}
+                      </div>
+                      {memory.tags && memory.tags.length > 0 && (
+                        <div className="memory-item-tags">
+                          {memory.tags.slice(0, 2).map((tag, index) => (
+                            <span key={index} className="memory-tag">
+                              {tag}
+                            </span>
+                          ))}
+                          {memory.tags.length > 2 && (
+                            <span className="memory-tag">
+                              +{memory.tags.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {publicMemories.length === 0 && (
+                <div className="empty-state">
+                  <Eye size={24} />
+                  <p>No public memories yet</p>
                 </div>
               )}
             </div>
@@ -574,6 +675,13 @@ function App() {
         isVisible={showLocationPermission}
         onLocationGranted={handleLocationGranted}
         onLocationDenied={handleLocationDenied}
+      />
+
+      {/* Friends Modal */}
+      <Friends
+        isVisible={showFriends}
+        onClose={() => setShowFriends(false)}
+        currentUserId={user?.id}
       />
     </div>
   );
