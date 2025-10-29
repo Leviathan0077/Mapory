@@ -79,3 +79,16 @@ export interface UserProfile {
   avatar_url: string;
   created_at: string;
 }
+declare module 'leaflet' {
+  interface LeafletEventHandlerFnMap {
+    _leaflet_id?: number;
+  }
+}
+
+declare global {
+  interface HTMLElement {
+    _leaflet_id?: number;
+  }
+}
+
+export {};
