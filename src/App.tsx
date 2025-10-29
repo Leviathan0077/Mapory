@@ -446,7 +446,12 @@ function App() {
           <p>Sign in to start creating your memory scrapbook</p>
           <button
             onClick={() =>
-              supabase.auth.signInWithOAuth({ provider: "google" })
+              supabase.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                  redirectTo: "https://mapory-4j8w.vercel.app/",
+                },
+              })
             }
             className="btn btn-primary"
           >

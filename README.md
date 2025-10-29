@@ -73,7 +73,8 @@ VITE_MAPBOX_ACCESS_TOKEN=your-mapbox-access-token
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
+Open [https://mapory-4j8w.vercel.app/
+](https://mapory-4j8w.vercel.app/) to view it in the browser.
 
 ## Project Structure
 
